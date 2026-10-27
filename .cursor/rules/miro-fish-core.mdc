@@ -1,0 +1,33 @@
+---
+description: Miro Fish product context, workflow, and honesty requirements
+alwaysApply: true
+---
+
+# Miro Fish
+AI-powered virtual customer simulation platform. Users submit a product idea (description, URL, pricing, ad copy, campaign), define an audience, and the app generates AI customer personas who each evaluate it. Reactions are aggregated into an interactive research dashboard with insights and recommendations. Full spec: @docs/PRODUCT.md
+
+Core workflow: submit idea → define audience → generate personas → run simulation → explore reactions → analyze results → improve → test again.
+
+## Stack
+- Next.js (App Router) + TypeScript (strict)
+- Tailwind + shadcn/ui + Framer Motion (subtle motion only)
+- Postgres (Supabase or Neon) + Drizzle ORM
+- Auth: Supabase Auth or Clerk
+- Background jobs: Inngest or Trigger.dev
+- LLM: Anthropic API via a single abstraction (lib/llm.ts), model swappable
+- Charts: Recharts
+- Zod on every API boundary and every LLM output
+
+## Honesty requirement (non-negotiable)
+Outputs are SIMULATED hypotheses, not verified market research.
+- Persistent unobtrusive "Simulated results" badge on all result views
+- Short explainer on first run
+- "How to validate this" section in every report (real interviews/surveys)
+- Never write "proves", "guarantees", or "X% will buy". Use "simulated interest", "likely objection", "hypothesis".
+
+## Working style
+- Build only the phase I ask for. Don't build ahead.
+- Start each phase with a short plan (bullets), then implement.
+- Small files, organized: features/, components/, lib/, db/, jobs/, prompts/
+- Always include mock/demo data and a MOCK_LLM env flag so every screen works without API credits.
+- End each phase with: what was built, how to run/test it, what's stubbed or incomplete, what's next.

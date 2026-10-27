@@ -1,0 +1,13 @@
+---
+description: UI/UX principles for all frontend work
+globs: ["**/*.tsx", "**/*.css"]
+alwaysApply: false
+---
+
+- Feels like a calm, premium research lab, not a generic AI chat app.
+- Spacious layout, strong typographic hierarchy, ONE accent color, dark + light mode.
+- Every screen: one clear primary action and a helpful empty state.
+- Skeletons and progress states for anything async. Never a blank screen.
+- Fully responsive, keyboard accessible, WCAG AA contrast.
+- Use shadcn/ui components and design tokens. No ad-hoc colors or magic spacing values.
+- Microcopy: plain, confident, human.

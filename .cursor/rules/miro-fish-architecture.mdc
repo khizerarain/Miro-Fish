@@ -1,0 +1,14 @@
+---
+description: Architecture rules for LLM calls, jobs, persistence, and cost control
+alwaysApply: true
+---
+
+1. NEVER one LLM call per persona. Generate personas in batches (25-50 per call) and simulate in batches (20-30 per call). For very large audiences, simulate a stratified sample of "anchor" personas in full detail and extrapolate segment weights to the rest, clearly labeled as extrapolated.
+2. Every LLM call returns JSON validated by Zod, with retry + repair on failure. All LLM access goes through lib/llm.ts (retry, JSON repair, token logging).
+3. Prompt templates live in /prompts as versioned files.
+4. Long work runs as background jobs with status: queued → generating → simulating → analyzing → complete/failed. UI shows live progress. Jobs are resumable, cancellable, and tolerate partial failure.
+5. Persist everything: ideas, audiences, personas, reactions, experiments, results.
+6. Seeded random demographics so reruns are comparable. Same seed + same audience = comparable A/B results.
+7. Cost guard: show estimated cost before running, per-user limits, hard cap per experiment.
+8. Every number shown in the UI must be computed in code from stored reactions. The LLM only writes narrative around computed stats.
+9. Simulation prompts must fight positivity bias: personas stay in character, are realistically skeptical, and many should ignore or reject the product.
