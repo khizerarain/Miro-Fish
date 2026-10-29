@@ -2,6 +2,7 @@
 
 import { Plus } from "lucide-react";
 import Link from "next/link";
+import { Suspense } from "react";
 import { usePathname } from "next/navigation";
 import { Logo, LogoMark } from "@/components/brand/logo";
 import {
@@ -20,7 +21,6 @@ import {
 import { APP_NAV } from "./nav";
 
 export function AppSidebar() {
-  const pathname = usePathname();
   const { state, isMobile, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed" && !isMobile;
   const closeOnMobile = () => isMobile && setOpenMobile(false);
@@ -40,21 +40,9 @@ export function AppSidebar() {
       <SidebarContent>
         <SidebarGroup>
           <SidebarGroupContent>
-            <SidebarMenu>
-              {APP_NAV.map((item) => {
-                const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
-                return (
-                  <SidebarMenuItem key={item.href}>
-                    <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
-                      <Link href={item.href} onClick={closeOnMobile} aria-current={active ? "page" : undefined}>
-                        <item.icon />
-                        <span>{item.label}</span>
-                      </Link>
-                    </SidebarMenuButton>
-                  </SidebarMenuItem>
-                );
-              })}
-            </SidebarMenu>
+            <Suspense fallback={<NavLinks pathname="" closeOnMobile={closeOnMobile} />}>
+              <ActiveNav closeOnMobile={closeOnMobile} />
+            </Suspense>
           </SidebarGroupContent>
         </SidebarGroup>
       </SidebarContent>
@@ -73,5 +61,29 @@ export function AppSidebar() {
       </SidebarFooter>
       <SidebarRail />
     </Sidebar>
+  );
+}
+
+function ActiveNav({ closeOnMobile }: { closeOnMobile: () => void }) {
+  return <NavLinks pathname={usePathname()} closeOnMobile={closeOnMobile} />;
+}
+
+function NavLinks({ pathname, closeOnMobile }: { pathname: string; closeOnMobile: () => void }) {
+  return (
+    <SidebarMenu>
+      {APP_NAV.map((item) => {
+        const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
+        return (
+          <SidebarMenuItem key={item.href}>
+            <SidebarMenuButton asChild isActive={active} tooltip={item.label}>
+              <Link href={item.href} onClick={closeOnMobile} aria-current={active ? "page" : undefined}>
+                <item.icon />
+                <span>{item.label}</span>
+              </Link>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        );
+      })}
+    </SidebarMenu>
   );
 }

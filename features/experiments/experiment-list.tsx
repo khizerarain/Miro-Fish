@@ -26,8 +26,26 @@ export function ExperimentList({ items, now }: { items: ExperimentListItem[]; no
   return (
     <ul className="divide-y rounded-2xl border bg-card">
       {items.map((item) => {
-        const status = item.ideaStatus ? STATUS[item.ideaStatus] : STATUS.draft;
-        const href = item.ideaId ? `/experiments/new?draft=${item.ideaId}` : "/experiments";
+        const run =
+          item.runStatus === "simulating" || item.runStatus === "queued"
+            ? { label: "Simulating", className: "bg-brand-soft text-brand-soft-foreground" }
+            : item.runStatus === "complete"
+              ? { label: "Simulated", className: "bg-primary text-primary-foreground" }
+              : item.runStatus === "cancelled"
+                ? { label: "Simulation paused", className: "bg-muted text-muted-foreground" }
+                : null;
+        const status = run ?? (item.ideaStatus ? STATUS[item.ideaStatus] : STATUS.draft);
+        const href =
+          item.runStatus === "simulating" ||
+          item.runStatus === "queued" ||
+          item.runStatus === "complete" ||
+          item.runStatus === "cancelled"
+            ? `/experiments/${item.id}/simulate`
+            : item.ideaStatus === "confirmed"
+              ? `/experiments/${item.id}/audience`
+              : item.ideaId
+                ? `/experiments/new?draft=${item.ideaId}`
+                : "/experiments";
         return (
           <li
             key={item.id}

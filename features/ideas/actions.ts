@@ -196,7 +196,10 @@ export async function saveAnalysis(ideaId: string, analysis: Analysis): Promise<
   return { ok: true, savedAt: updated.updatedAt.getTime() };
 }
 
-export async function confirmIdea(ideaId: string, analysis: Analysis): Promise<{ ok: true } | Fail> {
+export async function confirmIdea(
+  ideaId: string,
+  analysis: Analysis,
+): Promise<{ ok: true; experimentId: string } | Fail> {
   const user = await requireUser();
   const idea = await getOwnedIdea(user.id, ideaId);
   if (!idea) return { ok: false, error: "This draft no longer exists." };
@@ -204,7 +207,13 @@ export async function confirmIdea(ideaId: string, analysis: Analysis): Promise<{
   if (!parsed.success) return { ok: false, error: "Fill in the highlighted fields before confirming." };
   const db = await getDb();
   await db.update(ideas).set({ analysis: parsed.data, status: "confirmed" }).where(eq(ideas.id, ideaId));
-  return { ok: true };
+  const [exp] = await db
+    .select({ id: experiments.id })
+    .from(experiments)
+    .where(and(eq(experiments.ideaId, ideaId), eq(experiments.ownerId, user.id)))
+    .limit(1);
+  if (!exp) return { ok: false, error: "This experiment is missing. Start from the dashboard." };
+  return { ok: true, experimentId: exp.id };
 }
 
 /** Reopens step 1. The existing analysis is kept and flagged stale if inputs change. */

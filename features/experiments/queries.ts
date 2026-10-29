@@ -8,6 +8,7 @@ export type ExperimentListItem = {
   name: string;
   ideaId: string | null;
   ideaStatus: (typeof ideas.$inferSelect)["status"] | null;
+  runStatus: (typeof experiments.$inferSelect)["status"];
   updatedAt: Date;
 };
 
@@ -23,6 +24,7 @@ export async function listExperiments(
       name: experiments.name,
       ideaId: experiments.ideaId,
       ideaStatus: ideas.status,
+      runStatus: experiments.status,
       updatedAt: ideas.updatedAt,
     })
     .from(experiments)

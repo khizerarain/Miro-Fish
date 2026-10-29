@@ -137,6 +137,8 @@ export async function generateJson<T, V>(opts: {
   schema: z.ZodType<T>;
   mock: (vars: V) => T;
   images?: LlmImage[];
+  /** Override mock latency (persona batches should be shorter than a full analysis). */
+  mockDelayMs?: number;
 }): Promise<{ data: T; usage: LlmUsage; promptRef: string }> {
   const e = env();
   const promptRef = `${opts.prompt.id}@${opts.prompt.version}`;
@@ -153,7 +155,7 @@ export async function generateJson<T, V>(opts: {
   };
 
   if (e.MOCK_LLM) {
-    await sleep(e.MOCK_LLM_DELAY_MS);
+    await sleep(opts.mockDelayMs ?? e.MOCK_LLM_DELAY_MS);
     const data = opts.schema.parse(opts.mock(opts.vars));
     usage.inputTokens = estimateTokens(opts.prompt.system + user);
     usage.outputTokens = estimateTokens(JSON.stringify(data));

@@ -21,7 +21,11 @@ With the defaults, no external services are needed:
 
 ## LLM calls
 
-All model access goes through `lib/llm.ts` → `generateJson()`: Zod-validated JSON output, retries on 429/5xx, local JSON repair, then up to two model repair passes, and a structured `{"evt":"llm",...}` log line with token counts. Prompt templates live in `prompts/` as versioned files (`analyze-idea.v1.ts`); bump the version when wording changes.
+All model access goes through `lib/llm.ts` → `generateJson()`: Zod-validated JSON output, retries on 429/5xx, local JSON repair, then up to two model repair passes, and a structured `{"evt":"llm",...}` log line with token counts. Prompt templates live in `prompts/` as versioned files (`analyze-idea.v1.ts`, `generate-personas.v1.ts`, `simulate-reactions.v1.ts`); bump the version when wording changes.
+
+After confirming an idea, `/experiments/[id]/audience` lets you define segments and filters, pick a population size (100–5,000), and generate personas in batches of 30. Progress is live; the same seed + audience definition produces comparable demographics on rerun.
+
+`/experiments/[id]/simulate` runs reactions in batches of 25 (concurrency 2). A positivity check flags unrealistically upbeat batches. Audiences larger than 1,000 simulate a stratified sample and store the rest as extrapolated. Cancel and resume keep partial reactions.
 
 ## Using Supabase or Neon
 

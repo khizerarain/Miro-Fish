@@ -2,6 +2,7 @@
 
 import { AlertCircle, ArrowLeft, ArrowRight, Check, Loader2, RefreshCw } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -53,6 +54,8 @@ export function Wizard({ initial, mockMode }: { initial: WizardInitial; mockMode
   const [busy, setBusy] = useState(false);
   const [tab, setTab] = useState("describe");
   const [analysisSave, setAnalysisSave] = useState<"idle" | "pending" | "saved" | "error">("idle");
+  const [experimentId, setExperimentId] = useState<string | null>(null);
+  const router = useRouter();
 
   const autosave = useAutosave(initial.ideaId);
   const { sources, ready } = inputReadiness(input);
@@ -150,8 +153,8 @@ export function Wizard({ initial, mockMode }: { initial: WizardInitial; mockMode
     setBusy(false);
     if (!res?.ok) return toast.error(res?.error ?? "Couldn't confirm. Try again.");
     clearLocalDraft(autosave.ideaId);
-    setStep(3);
-    window.scrollTo({ top: 0, behavior: "smooth" });
+    setExperimentId(res.experimentId);
+    router.push(`/experiments/${res.experimentId}/audience`);
   }
 
   const heading = { 1: "Submit your idea", 2: "Review the analysis", 3: "Idea confirmed" }[step];
@@ -338,15 +341,15 @@ export function Wizard({ initial, mockMode }: { initial: WizardInitial; mockMode
             </ul>
           </CardContent>
           <CardFooter className="flex flex-col items-stretch gap-3 border-t pt-6 sm:flex-row sm:items-center sm:justify-between">
-            <p className="text-sm text-muted-foreground">
-              Audience building is the next step. It isn&apos;t available yet.
-            </p>
+            <p className="text-sm text-muted-foreground">Next: define who these people are.</p>
             <div className="flex gap-2">
               <Button variant="ghost" onClick={backToEdit} disabled={busy}>
                 Edit idea
               </Button>
               <Button asChild>
-                <Link href="/experiments">Go to experiments</Link>
+                <Link href={experimentId ? `/experiments/${experimentId}/audience` : "/experiments"}>
+                  Define audience <ArrowRight />
+                </Link>
               </Button>
             </div>
           </CardFooter>
