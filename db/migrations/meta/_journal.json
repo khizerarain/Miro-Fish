@@ -8,6 +8,13 @@
       "when": 1793128210681,
       "tag": "0000_init",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1793302398766,
+      "tag": "0001_idea_wizard_fields",
+      "breakpoints": true
     }
   ]
 }

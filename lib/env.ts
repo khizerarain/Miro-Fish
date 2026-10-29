@@ -20,6 +20,7 @@ const serverSchema = z
     NEXT_PUBLIC_SUPABASE_ANON_KEY: z.string().min(1).optional(),
 
     MOCK_LLM: boolish.default(true),
+    MOCK_LLM_DELAY_MS: z.coerce.number().int().min(0).max(30_000).default(1200),
     ANTHROPIC_API_KEY: z.string().min(1).optional(),
     LLM_MODEL: z.string().default("claude-sonnet-4-5"),
   })

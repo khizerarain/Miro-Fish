@@ -1,12 +1,11 @@
-import { and, count, eq, isNull } from "drizzle-orm";
-import { ArrowRight, FlaskConical } from "lucide-react";
+import { ArrowRight, FlaskConical, Plus } from "lucide-react";
 import Link from "next/link";
 import { EmptyState } from "@/components/empty-state";
 import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { getDb } from "@/db";
-import { experiments } from "@/db/schema";
+import { ExperimentList, ExperimentListSkeleton } from "@/features/experiments/experiment-list";
+import { listExperiments } from "@/features/experiments/queries";
 import { requireUser } from "@/lib/auth";
 
 function greeting(name: string | null) {
@@ -16,19 +15,7 @@ function greeting(name: string | null) {
 
 export async function DashboardContent() {
   const user = await requireUser();
-  const db = await getDb();
-  const [{ total }] = await db
-    .select({ total: count() })
-    .from(experiments)
-    .where(and(eq(experiments.ownerId, user.id), isNull(experiments.archivedAt)));
-
-  const newExperiment = (
-    <Button asChild size="lg">
-      <Link href="/experiments/new">
-        Start your first experiment <ArrowRight />
-      </Link>
-    </Button>
-  );
+  const { items, now } = await listExperiments(user.id, 6);
 
   return (
     <div className="space-y-10">
@@ -36,16 +23,42 @@ export async function DashboardContent() {
         eyebrow="Dashboard"
         title={greeting(user.name)}
         description="Your research lab. Submit an idea, define an audience, and see how simulated customers react."
+        actions={
+          items.length > 0 && (
+            <Button asChild>
+              <Link href="/experiments/new">
+                <Plus /> New experiment
+              </Link>
+            </Button>
+          )
+        }
       />
-      {total === 0 ? (
+      {items.length === 0 ? (
         <EmptyState
           icon={FlaskConical}
           title="No experiments yet"
           description="Describe a product, paste a landing page, or drop in ad copy. We'll build a simulated audience and show you where it lands, and where it doesn't."
-          action={newExperiment}
+          action={
+            <Button asChild size="lg">
+              <Link href="/experiments/new">
+                Start your first experiment <ArrowRight />
+              </Link>
+            </Button>
+          }
         />
       ) : (
-        <p className="text-muted-foreground">{total} experiments</p>
+        <section className="space-y-4">
+          <div className="flex items-baseline justify-between">
+            <h2 className="text-subheading font-medium">Recent experiments</h2>
+            <Link
+              href="/experiments"
+              className="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline"
+            >
+              View all
+            </Link>
+          </div>
+          <ExperimentList items={items} now={now} />
+        </section>
       )}
     </div>
   );
@@ -59,7 +72,7 @@ export function DashboardSkeleton() {
         <Skeleton className="h-9 w-64" />
         <Skeleton className="h-4 w-96 max-w-full" />
       </div>
-      <Skeleton className="h-72 w-full rounded-2xl" />
+      <ExperimentListSkeleton />
     </div>
   );
 }

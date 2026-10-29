@@ -95,10 +95,15 @@ export const ideas = pgTable(
     url: text("url"),
     urlExtract: text("url_extract"),
     pricing: jsonb("pricing"),
+    adHeadline: text("ad_headline"),
     adCopy: text("ad_copy"),
+    adChannel: text("ad_channel"),
+    /** Downscaled data URL. Move to object storage before production. */
     adImageUrl: text("ad_image_url"),
     /** Zod-validated LLM analysis, editable by the user. */
     analysis: jsonb("analysis"),
+    /** Hash of the inputs the current analysis was generated from; detects stale analyses. */
+    analyzedInputHash: text("analyzed_input_hash"),
     status: ideaStatusEnum("status").notNull().default("draft"),
     ...timestamps,
   },

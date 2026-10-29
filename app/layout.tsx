@@ -25,6 +25,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
     <html
       lang="en"
       suppressHydrationWarning
+      data-scroll-behavior="smooth"
       className={`${geistSans.variable} ${geistMono.variable} ${displaySerif.variable} h-full`}
     >
       <body className="flex min-h-full flex-col">
