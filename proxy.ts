@@ -4,7 +4,6 @@ import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth/session-token";
 import { env } from "@/lib/env";
 
 const PROTECTED_PREFIXES = ["/dashboard", "/experiments", "/audiences", "/settings"];
-const AUTH_PAGES = ["/login", "/signup"];
 
 const matches = (path: string, prefixes: string[]) => prefixes.some((p) => path === p || path.startsWith(`${p}/`));
 
@@ -39,9 +38,8 @@ export async function proxy(request: NextRequest) {
     url.searchParams.set("next", pathname + search);
     return NextResponse.redirect(url);
   }
-  if (signedIn && matches(pathname, AUTH_PAGES)) {
-    return NextResponse.redirect(new URL("/dashboard", request.url));
-  }
+  // Signed-in users on /login and /signup are redirected by the page itself, after the user row is
+  // confirmed to exist. Doing it here from the cookie alone loops when the user has been deleted.
   return response;
 }
 

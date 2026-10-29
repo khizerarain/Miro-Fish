@@ -1,6 +1,7 @@
 import { Suspense } from "react";
 import { Skeleton } from "@/components/ui/skeleton";
 import { AuthForm } from "./auth-form";
+import { RedirectIfSignedIn } from "./redirect-if-signed-in";
 
 function FormSkeleton({ fields }: { fields: number }) {
   return (
@@ -27,6 +28,9 @@ export function AuthCard({
 }) {
   return (
     <div className="space-y-8">
+      <Suspense fallback={null}>
+        <RedirectIfSignedIn />
+      </Suspense>
       <div className="space-y-2 text-center">
         <h1 className="font-display text-title">{title}</h1>
         <p className="text-sm text-muted-foreground">{description}</p>
