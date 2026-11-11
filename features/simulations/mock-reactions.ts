@@ -84,8 +84,22 @@ export function mockReactionBatch(
   seed: number,
 ): ReactionLlm[] {
   return personas.map((p) => {
-    const rng = rngFor(seed, p.ordinal, p.segmentKey, product.summary.slice(0, 24));
-    const score = band(rng, p);
+    const rng = rngFor(
+      seed,
+      p.ordinal,
+      p.segmentKey,
+      product.summary.slice(0, 40),
+      product.valueProposition.slice(0, 40),
+      product.adHeadline,
+      product.adCopy.slice(0, 40),
+      String(product.listedPrice ?? ""),
+    );
+    let score = band(rng, p) + copyOffset(product, seed);
+    if (product.listedPrice != null) {
+      if (product.listedPrice > 40) score -= p.priceSensitivity === "high" ? 10 : 4;
+      else if (product.listedPrice < 15) score += p.priceSensitivity === "high" ? 8 : 3;
+    }
+    score = Math.max(0, Math.min(100, score));
     const voice = score < 22 ? IGNORE : score < 48 ? SKEPTIC : score < 72 ? MILD : WARM;
     const intent = intentFor(score);
     const price = priceFor(score, p, product.listedPrice, rng);
@@ -108,6 +122,12 @@ export function mockReactionBatch(
         : "I would not vouch for something I have not used through a bad week.",
     };
   });
+}
+
+/** Same distribution of people, different pitch → a small systematic mean shift so A/B is visible. */
+function copyOffset(product: VariantContent, seed: number) {
+  const rng = rngFor(seed, "copy-offset", product.adHeadline, product.valueProposition, product.summary.slice(0, 80));
+  return Math.round((rng() - 0.5) * 12);
 }
 
 function pickNUnique(rng: () => number, items: readonly string[], n: number): string[] {

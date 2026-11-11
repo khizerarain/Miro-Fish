@@ -164,3 +164,16 @@
 @utility text-eyebrow-caps {
   @apply text-eyebrow font-medium text-muted-foreground uppercase;
 }
+
+@media print {
+  [data-slot="sidebar"],
+  [data-slot="sidebar-gap"],
+  [data-slot="sidebar-container"],
+  [data-sidebar="sidebar"] {
+    display: none !important;
+  }
+  main {
+    max-width: none !important;
+    padding: 0 !important;
+  }
+}

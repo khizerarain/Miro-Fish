@@ -49,6 +49,7 @@ export const insightKindEnum = pgEnum("insight_kind", [
   "messaging",
   "recommendation",
   "validation",
+  "comparison",
 ]);
 
 export const users = pgTable(
@@ -178,6 +179,8 @@ export const experiments = pgTable(
     costCapCents: integer("cost_cap_cents"),
     /** Copied from the previous run when this experiment is an "improve and rerun". */
     parentExperimentId: uuid("parent_experiment_id"),
+    /** Short note of what changed from the parent (recommendation title, duplicate, etc.). */
+    changeSummary: text("change_summary"),
     archivedAt: timestamp("archived_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     ...timestamps,
@@ -286,6 +289,88 @@ export const jobs = pgTable(
   ],
 );
 
+/** One thread per persona × variant. Interactive chat is 1:1, not a population batch. */
+export const chats = pgTable(
+  "chats",
+  {
+    id: id(),
+    experimentId: uuid("experiment_id")
+      .notNull()
+      .references(() => experiments.id, { onDelete: "cascade" }),
+    personaId: uuid("persona_id")
+      .notNull()
+      .references(() => personas.id, { onDelete: "cascade" }),
+    variantId: uuid("variant_id")
+      .notNull()
+      .references(() => experimentVariants.id, { onDelete: "cascade" }),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("chats_experiment_persona_variant_idx").on(t.experimentId, t.personaId, t.variantId),
+    index("chats_experiment_idx").on(t.experimentId),
+  ],
+);
+
+export const chatMessages = pgTable(
+  "chat_messages",
+  {
+    id: id(),
+    chatId: uuid("chat_id")
+      .notNull()
+      .references(() => chats.id, { onDelete: "cascade" }),
+    role: text("role").notNull(),
+    content: text("content").notNull(),
+    /** mode, updatedIntent, updatedScore for convince-me turns. */
+    payload: jsonb("payload").notNull().default({}),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("chat_messages_chat_idx").on(t.chatId, t.createdAt)],
+);
+
+export const researchNotes = pgTable(
+  "research_notes",
+  {
+    id: id(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    experimentId: uuid("experiment_id")
+      .notNull()
+      .references(() => experiments.id, { onDelete: "cascade" }),
+    personaId: uuid("persona_id").references(() => personas.id, { onDelete: "set null" }),
+    variantId: uuid("variant_id").references(() => experimentVariants.id, { onDelete: "set null" }),
+    quote: text("quote").notNull(),
+    context: text("context"),
+    source: text("source").notNull().default("chat"),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("research_notes_experiment_idx").on(t.experimentId, t.createdAt)],
+);
+
+export const realityImports = pgTable(
+  "reality_imports",
+  {
+    id: id(),
+    ownerId: uuid("owner_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    experimentId: uuid("experiment_id")
+      .notNull()
+      .references(() => experiments.id, { onDelete: "cascade" }),
+    filename: text("filename").notNull(),
+    kind: text("kind").notNull(),
+    rowCount: integer("row_count").notNull().default(0),
+    payload: jsonb("payload").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [index("reality_imports_experiment_idx").on(t.experimentId, t.createdAt)],
+);
+
+
 export type User = typeof users.$inferSelect;
 export type Project = typeof projects.$inferSelect;
 export type Experiment = typeof experiments.$inferSelect;
+export type Chat = typeof chats.$inferSelect;
+export type ChatMessage = typeof chatMessages.$inferSelect;
+export type ResearchNote = typeof researchNotes.$inferSelect;
+export type RealityImport = typeof realityImports.$inferSelect;

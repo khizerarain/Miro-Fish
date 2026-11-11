@@ -2,6 +2,7 @@ import type { PurchaseIntent, PriceReaction } from "./schemas";
 
 export type ReactionSample = {
   id: string;
+  personaId: string;
   personaName: string;
   segmentKey: string;
   interestScore: number;

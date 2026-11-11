@@ -56,10 +56,7 @@ export async function ensureControlVariant(experimentId: string, idea: typeof id
     adHeadline: idea?.adHeadline ?? null,
     adCopy: idea?.adCopy ?? null,
   });
-  if (existing) {
-    await db.update(experimentVariants).set({ content }).where(eq(experimentVariants.id, existing.id));
-    return { ...existing, content };
-  }
+  if (existing) return existing;
   const [created] = await db
     .insert(experimentVariants)
     .values({
@@ -92,9 +89,12 @@ export async function reactionTally(experimentId: string): Promise<ReactionTally
   return tallyFromRows(rows);
 }
 
-export async function countReactions(experimentId: string) {
+export async function countReactions(experimentId: string, variantId?: string) {
   const db = await getDb();
-  const [row] = await db.select({ n: count() }).from(reactions).where(eq(reactions.experimentId, experimentId));
+  const [row] = await db
+    .select({ n: count() })
+    .from(reactions)
+    .where(variantId ? and(eq(reactions.experimentId, experimentId), eq(reactions.variantId, variantId)) : eq(reactions.experimentId, experimentId));
   return row?.n ?? 0;
 }
 

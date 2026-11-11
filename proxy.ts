@@ -3,7 +3,7 @@ import { type NextRequest, NextResponse } from "next/server";
 import { SESSION_COOKIE, verifySessionToken } from "@/lib/auth/session-token";
 import { env } from "@/lib/env";
 
-const PROTECTED_PREFIXES = ["/dashboard", "/experiments", "/audiences", "/settings"];
+const PROTECTED_PREFIXES = ["/dashboard", "/experiments", "/audiences", "/settings", "/projects"];
 
 const matches = (path: string, prefixes: string[]) => prefixes.some((p) => path === p || path.startsWith(`${p}/`));
 

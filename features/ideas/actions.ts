@@ -11,8 +11,12 @@ import { inputHash } from "./input-hash";
 import { mockAnalyzeIdea } from "./mock-analysis";
 import { pricingToText } from "./pricing-text";
 import { getOwnedIdea, rowToWizardState, type WizardState } from "./queries";
+import { ensureProject } from "@/features/projects/queries";
+import { enforceRateLimit, RateLimitError } from "@/lib/rate-limit";
+import { assertExperimentRoom } from "@/lib/usage";
 import { type Analysis, analysisSchema, type IdeaInput, ideaInputSchema, inputReadiness } from "./schemas";
 import { fetchAndExtract, type UrlExtractResult } from "./url-extract";
+import { revalidatePath } from "next/cache";
 
 type Fail = { ok: false; error: string };
 
@@ -45,6 +49,8 @@ export async function saveDraft(
   const db = await getDb();
 
   if (!ideaId) {
+    const room = await assertExperimentRoom(user.id);
+    if (room) return { ok: false, error: room };
     const created = await db.transaction(async (tx) => {
       const [idea] = await tx
         .insert(ideas)
@@ -89,6 +95,12 @@ export async function analyzeIdea(
   opts: { force?: boolean } = {},
 ): Promise<{ ok: true; state: WizardState } | Fail> {
   const user = await requireUser();
+  try {
+    enforceRateLimit(user.id, "analyze-idea", 12, 60_000);
+  } catch (err) {
+    if (err instanceof RateLimitError) return { ok: false, error: err.message };
+    throw err;
+  }
   if (!idSchema.safeParse(ideaId).success) return { ok: false, error: "Unknown draft." };
   const idea = await getOwnedIdea(user.id, ideaId);
   if (!idea) return { ok: false, error: "This draft no longer exists." };
@@ -208,11 +220,20 @@ export async function confirmIdea(
   const db = await getDb();
   await db.update(ideas).set({ analysis: parsed.data, status: "confirmed" }).where(eq(ideas.id, ideaId));
   const [exp] = await db
-    .select({ id: experiments.id })
+    .select()
     .from(experiments)
     .where(and(eq(experiments.ideaId, ideaId), eq(experiments.ownerId, user.id)))
     .limit(1);
   if (!exp) return { ok: false, error: "This experiment is missing. Start from the dashboard." };
+  if (!exp.projectId) {
+    const project = await ensureProject(user.id, (idea.title || exp.name).slice(0, 80));
+    await db.update(experiments).set({ projectId: project.id }).where(eq(experiments.id, exp.id));
+    await db.update(ideas).set({ projectId: project.id }).where(eq(ideas.id, ideaId));
+    revalidatePath("/projects");
+    revalidatePath(`/projects/${project.id}`);
+  }
+  revalidatePath("/experiments");
+  revalidatePath("/dashboard");
   return { ok: true, experimentId: exp.id };
 }
 

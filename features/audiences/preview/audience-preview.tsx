@@ -8,6 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { VirtualList } from "@/components/virtual-list";
 import { fetchPersonaPage, saveAudienceTemplate } from "../actions";
 import { INCOME_BANDS } from "../constants";
 import { profileOf } from "../profile";
@@ -15,6 +16,7 @@ import type { AudienceDefinition, PersonaProfile } from "../schemas";
 import { StartSimulationCard } from "@/features/simulations/start-card";
 import { DemoCharts } from "./demo-charts";
 import { PersonaDrawer } from "./persona-drawer";
+import { ChatDrawer, type ChatTarget } from "@/features/chat/drawer";
 
 type Row = {
   id: string;
@@ -64,7 +66,8 @@ export function AudiencePreview({
   const [segment, setSegment] = useState("all");
   const [income, setIncome] = useState("all");
   const [q, setQ] = useState("");
-  const [open, setOpen] = useState<PersonaProfile | null>(null);
+  const [open, setOpen] = useState<{ id: string; profile: PersonaProfile } | null>(null);
+  const [chat, setChat] = useState<ChatTarget | null>(null);
   const [pending, start] = useTransition();
   const [saving, setSaving] = useState(false);
 
@@ -113,7 +116,7 @@ export function AudiencePreview({
             <Save /> Save as template
           </Button>
           <Button variant="outline" onClick={onRegenerate}>
-            Generate again
+            Regenerate what changed
           </Button>
         </div>
       </div>
@@ -193,7 +196,7 @@ export function AudiencePreview({
                 aria-label={`Open ${r.name}`}
                 onClick={() => {
                   const p = profileOf(r);
-                  if (p) setOpen(p);
+                  if (p) setOpen({ id: r.id, profile: p });
                   else toast.error("Couldn't read this persona.");
                 }}
                 className="w-full rounded-xl border bg-card p-4 text-left shadow-soft transition-colors hover:bg-muted/40"
@@ -221,32 +224,50 @@ export function AudiencePreview({
             </TableRow>
           </TableHeader>
           <TableBody>
-            {rows.map((r) => (
-              <TableRow
-                key={r.id}
-                className="cursor-pointer"
-                onClick={() => {
-                  const p = profileOf(r);
-                  if (p) setOpen(p);
-                  else toast.error("Couldn't read this persona.");
-                }}
-              >
-                <TableCell className="font-medium">{r.name}</TableCell>
-                <TableCell>{r.age}</TableCell>
-                <TableCell>{r.profession}</TableCell>
-                <TableCell>{labels[r.segmentKey] ?? r.segmentKey}</TableCell>
-                <TableCell>{r.location}</TableCell>
-              </TableRow>
-            ))}
+            <TableRow>
+              <TableCell colSpan={5} className="p-0">
+                <VirtualList
+                  items={rows}
+                  rowHeight={44}
+                  height={Math.min(440, Math.max(176, rows.length * 44))}
+                  render={(r) => (
+                    <button
+                      type="button"
+                      className="grid w-full grid-cols-5 items-center gap-2 px-2 text-left text-sm hover:bg-muted/40"
+                      style={{ height: 44 }}
+                      onClick={() => {
+                        const p = profileOf(r);
+                        if (p) setOpen({ id: r.id, profile: p });
+                        else toast.error("Couldn't read this persona.");
+                      }}
+                    >
+                      <span className="font-medium">{r.name}</span>
+                      <span>{r.age}</span>
+                      <span>{r.profession}</span>
+                      <span>{labels[r.segmentKey] ?? r.segmentKey}</span>
+                      <span>{r.location}</span>
+                    </button>
+                  )}
+                />
+              </TableCell>
+            </TableRow>
           </TableBody>
         </Table>
       )}
 
       <PersonaDrawer
-        persona={open}
-        segmentLabel={open ? (labels[open.segmentKey] ?? open.segmentKey) : ""}
+        persona={open?.profile ?? null}
+        segmentLabel={open ? (labels[open.profile.segmentKey] ?? open.profile.segmentKey) : ""}
         onClose={() => setOpen(null)}
+        onTalk={
+          open
+            ? () => {
+                setChat({ personaId: open.id });
+              }
+            : undefined
+        }
       />
+      <ChatDrawer experimentId={experimentId} target={chat} onClose={() => setChat(null)} />
     </div>
   );
 }

@@ -92,8 +92,8 @@ export async function snapshotSimulationJob(jobId: string): Promise<SimulationSn
   const cp = readCheckpoint(job.checkpoint);
   const [exp, tally, samples] = await Promise.all([
     db.select().from(experiments).where(eq(experiments.id, job.experimentId)).limit(1).then((r) => r[0]),
-    loadTally(job.experimentId),
-    loadSamples(job.experimentId, 12),
+    loadTally(job.experimentId, cp?.variantId),
+    loadSamples(job.experimentId, 12, cp?.variantId),
   ]);
   const total = job.totalUnits;
   const anchors = cp?.anchorIds === "all" ? total : (cp?.anchorIds.length ?? total);
@@ -124,7 +124,7 @@ export async function snapshotSimulationJob(jobId: string): Promise<SimulationSn
   };
 }
 
-async function loadTally(experimentId: string): Promise<ReactionTally> {
+async function loadTally(experimentId: string, variantId?: string): Promise<ReactionTally> {
   const db = await getDb();
   const rows = await db
     .select({
@@ -135,15 +135,20 @@ async function loadTally(experimentId: string): Promise<ReactionTally> {
       isExtrapolated: reactions.isExtrapolated,
     })
     .from(reactions)
-    .where(eq(reactions.experimentId, experimentId));
+    .where(
+      variantId
+        ? and(eq(reactions.experimentId, experimentId), eq(reactions.variantId, variantId))
+        : eq(reactions.experimentId, experimentId),
+    );
   return tallyFromRows(rows);
 }
 
-async function loadSamples(experimentId: string, take: number): Promise<ReactionSample[]> {
+async function loadSamples(experimentId: string, take: number, variantId?: string): Promise<ReactionSample[]> {
   const db = await getDb();
   const rows = await db
     .select({
       id: reactions.id,
+      personaId: reactions.personaId,
       personaName: personas.name,
       segmentKey: personas.segmentKey,
       interestScore: reactions.interestScore,
@@ -154,13 +159,18 @@ async function loadSamples(experimentId: string, take: number): Promise<Reaction
     })
     .from(reactions)
     .innerJoin(personas, eq(personas.id, reactions.personaId))
-    .where(eq(reactions.experimentId, experimentId))
+    .where(
+      variantId
+        ? and(eq(reactions.experimentId, experimentId), eq(reactions.variantId, variantId))
+        : eq(reactions.experimentId, experimentId),
+    )
     .orderBy(desc(reactions.createdAt))
     .limit(take);
   return rows.map((r) => {
     const payload = reactionPayloadSchema.safeParse(r.payload);
     return {
       id: r.id,
+      personaId: r.personaId,
       personaName: r.personaName,
       segmentKey: r.segmentKey,
       interestScore: r.interestScore,
@@ -280,7 +290,7 @@ async function processOneWave(jobId: string): Promise<boolean> {
   const stored = await db
     .select({ n: count() })
     .from(reactions)
-    .where(eq(reactions.experimentId, exp.id))
+    .where(and(eq(reactions.experimentId, exp.id), eq(reactions.variantId, cp.variantId)))
     .then((r) => r[0]?.n ?? 0);
 
   const actualCostCents = centsFromTokens(inputTokens, outputTokens);
@@ -401,7 +411,9 @@ async function extrapolateWave(job: typeof jobs.$inferSelect, cp: Checkpoint): P
     })
     .from(reactions)
     .innerJoin(personas, eq(personas.id, reactions.personaId))
-    .where(and(eq(reactions.experimentId, job.experimentId), eq(reactions.isExtrapolated, false)));
+    .where(
+      and(eq(reactions.experimentId, job.experimentId), eq(reactions.variantId, cp.variantId), eq(reactions.isExtrapolated, false)),
+    );
 
   if (!donors.length) {
     await fail(job.id, job.experimentId, "Nothing to extrapolate from.");
@@ -453,7 +465,7 @@ async function extrapolateWave(job: typeof jobs.$inferSelect, cp: Checkpoint): P
   const stored = await db
     .select({ n: count() })
     .from(reactions)
-    .where(eq(reactions.experimentId, job.experimentId))
+    .where(and(eq(reactions.experimentId, job.experimentId), eq(reactions.variantId, cp.variantId)))
     .then((r) => r[0]?.n ?? 0);
   await db.update(jobs).set({ completedUnits: stored }).where(eq(jobs.id, job.id));
   if (await stopIfCancelled(job.id, job.experimentId)) return false;

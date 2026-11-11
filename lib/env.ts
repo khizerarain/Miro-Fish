@@ -23,6 +23,16 @@ const serverSchema = z
     MOCK_LLM_DELAY_MS: z.coerce.number().int().min(0).max(30_000).default(1200),
     ANTHROPIC_API_KEY: z.string().min(1).optional(),
     LLM_MODEL: z.string().default("claude-sonnet-4-5"),
+
+    // --- GitHub App ---
+    // All optional: without them the GitHub integration reports "not configured" instead of crashing.
+    GITHUB_APP_ID: z.string().regex(/^\d+$/).optional(),
+    /** PEM private key. Literal "\n" escapes are accepted so it can live on one line. */
+    GITHUB_APP_PRIVATE_KEY: z.string().min(1).optional(),
+    /** Secret configured on the App's webhook. Required to accept deliveries. */
+    GITHUB_WEBHOOK_SECRET: z.string().min(16).optional(),
+    /** App slug, used to build the install URL: https://github.com/apps/<slug>/installations/new */
+    GITHUB_APP_SLUG: z.string().min(1).optional(),
   })
   .superRefine((env, ctx) => {
     if (env.AUTH_PROVIDER === "local" && !env.AUTH_SECRET) {
@@ -48,6 +58,10 @@ function parseEnv(): Env {
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || undefined,
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || undefined,
     ANTHROPIC_API_KEY: process.env.ANTHROPIC_API_KEY || undefined,
+    GITHUB_APP_ID: process.env.GITHUB_APP_ID || undefined,
+    GITHUB_APP_PRIVATE_KEY: process.env.GITHUB_APP_PRIVATE_KEY || undefined,
+    GITHUB_WEBHOOK_SECRET: process.env.GITHUB_WEBHOOK_SECRET || undefined,
+    GITHUB_APP_SLUG: process.env.GITHUB_APP_SLUG || undefined,
   });
   if (!parsed.success) {
     const issues = parsed.error.issues.map((i) => `  - ${i.path.join(".")}: ${i.message}`).join("\n");

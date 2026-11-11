@@ -1,13 +1,15 @@
 "use server";
 
 import { after } from "next/server";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, notInArray } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/db";
 import { audiences, experiments, ideas, jobs, personas } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { env } from "@/lib/env";
+import { allSkeletons } from "./allocate";
 import { estimatePersonaJob } from "./cost";
+import { enforceRateLimit, RateLimitError } from "@/lib/rate-limit";
 import {
   audienceDefinitionSchema,
   audienceSizeSchema,
@@ -70,6 +72,12 @@ export async function saveAudienceDraft(
 
 export async function startPersonaGeneration(audienceId: string): Promise<{ ok: true; jobId: string } | Fail> {
   const user = await requireUser();
+  try {
+    enforceRateLimit(user.id, "generate-personas", 8, 60_000);
+  } catch (err) {
+    if (err instanceof RateLimitError) return { ok: false, error: err.message };
+    throw err;
+  }
   const row = await getOwnedAudience(user.id, audienceId);
   if (!row) return { ok: false, error: "This audience no longer exists." };
   const def = audienceDefinitionSchema.safeParse(row.definition);
@@ -79,7 +87,20 @@ export async function startPersonaGeneration(audienceId: string): Promise<{ ok: 
   const [exp] = await db.select().from(experiments).where(eq(experiments.audienceId, audienceId)).limit(1);
   const idea = exp?.ideaId ? (await db.select().from(ideas).where(eq(ideas.id, exp.ideaId)).limit(1))[0] : undefined;
 
-  await db.delete(personas).where(eq(personas.audienceId, audienceId));
+  const skeletons = allSkeletons(row.seed, def.data, row.size);
+  const existing = await db.select().from(personas).where(eq(personas.audienceId, audienceId));
+  const byOrdinal = new Map(skeletons.map((s) => [s.ordinal, s]));
+  const keepIds = existing
+    .filter((p) => {
+      const sk = byOrdinal.get(p.ordinal);
+      return sk && sk.segmentKey === p.segmentKey && sk.age === p.age;
+    })
+    .map((p) => p.id);
+  if (keepIds.length === 0) {
+    await db.delete(personas).where(eq(personas.audienceId, audienceId));
+  } else if (keepIds.length < existing.length) {
+    await db.delete(personas).where(and(eq(personas.audienceId, audienceId), notInArray(personas.id, keepIds)));
+  }
   await db
     .update(jobs)
     .set({ status: "cancelled", cancelRequestedAt: new Date(), finishedAt: new Date() })
@@ -96,7 +117,7 @@ export async function startPersonaGeneration(audienceId: string): Promise<{ ok: 
       experimentId: exp?.id,
       ideaId: exp?.ideaId,
       totalUnits: row.size,
-      completedUnits: 0,
+      completedUnits: keepIds.length,
       checkpoint: { nextOrdinal: 0, idea: ideaContextFromAnalysis(idea?.analysis) },
       startedAt: new Date(),
     })
@@ -111,6 +132,7 @@ export async function startPersonaGeneration(audienceId: string): Promise<{ ok: 
   }
 
   await tickPersonaJob(job.id);
+  after(() => ensurePersonaJobRunning(job.id));
   return { ok: true, jobId: job.id };
 }
 

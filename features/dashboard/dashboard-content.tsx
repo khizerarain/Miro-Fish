@@ -6,7 +6,9 @@ import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ExperimentList, ExperimentListSkeleton } from "@/features/experiments/experiment-list";
 import { listExperiments } from "@/features/experiments/queries";
+import { listProjects } from "@/features/projects/queries";
 import { requireUser } from "@/lib/auth";
+import { OnboardingTour } from "@/components/onboarding-tour";
 
 function greeting(name: string | null) {
   const first = name?.split(" ")[0];
@@ -15,10 +17,11 @@ function greeting(name: string | null) {
 
 export async function DashboardContent() {
   const user = await requireUser();
-  const { items, now } = await listExperiments(user.id, 6);
+  const [{ items, now }, projects] = await Promise.all([listExperiments(user.id, 6), listProjects(user.id)]);
 
   return (
     <div className="space-y-10">
+      <OnboardingTour />
       <PageHeader
         eyebrow="Dashboard"
         title={greeting(user.name)}
@@ -57,7 +60,7 @@ export async function DashboardContent() {
               View all
             </Link>
           </div>
-          <ExperimentList items={items} now={now} />
+          <ExperimentList items={items} now={now} projects={projects.map((p) => ({ id: p.id, name: p.name }))} />
         </section>
       )}
     </div>

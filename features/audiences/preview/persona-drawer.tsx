@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import type { PersonaProfile } from "../schemas";
 
@@ -8,10 +9,12 @@ export function PersonaDrawer({
   persona,
   segmentLabel,
   onClose,
+  onTalk,
 }: {
   persona: PersonaProfile | null;
   segmentLabel: string;
   onClose: () => void;
+  onTalk?: () => void;
 }) {
   return (
     <Sheet open={!!persona} onOpenChange={(o) => !o && onClose()}>
@@ -36,6 +39,11 @@ export function PersonaDrawer({
               <List label="Needs" items={persona.needs} />
               <List label="Pain points" items={persona.painPoints} />
               <List label="Uses today" items={persona.currentAlternatives} />
+              {onTalk && (
+                <Button type="button" onClick={onTalk}>
+                  Talk
+                </Button>
+              )}
             </div>
           </>
         )}

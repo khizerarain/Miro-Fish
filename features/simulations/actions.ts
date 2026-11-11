@@ -4,9 +4,10 @@ import { after } from "next/server";
 import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/db";
-import { experiments, jobs, reactions } from "@/db/schema";
+import { experimentVariants, experiments, insights, jobs, reactions } from "@/db/schema";
 import { requireUser } from "@/lib/auth";
 import { env } from "@/lib/env";
+import { enforceRateLimit, RateLimitError } from "@/lib/rate-limit";
 import { DEFAULT_COST_CAP_CENTS } from "./constants";
 import { estimateSimulationJob } from "./cost";
 import {
@@ -39,9 +40,45 @@ export async function startSimulation(experimentId: string): Promise<{ ok: true;
   if (!idSchema.safeParse(experimentId).success) return { ok: false, error: "Unknown experiment." };
   const exp = await getExperimentForUser(user.id, experimentId);
   if (!exp?.audienceId) return { ok: false, error: "This experiment has no audience yet." };
+  const idea = await loadIdeaForExperiment(exp.ideaId);
+  const variant = await ensureControlVariant(exp.id, idea);
+  return startSimulationForVariant(experimentId, variant.id);
+}
+
+const DASHBOARD_INSIGHT_KINDS = [
+  "headline",
+  "objection_cluster",
+  "feature_cluster",
+  "pricing",
+  "messaging",
+  "recommendation",
+  "validation",
+] as const;
+
+export async function startSimulationForVariant(experimentId: string, variantId: string): Promise<{ ok: true; jobId: string } | Fail> {
+  const user = await requireUser();
+  try {
+    enforceRateLimit(user.id, "simulate", 8, 60_000);
+  } catch (err) {
+    if (err instanceof RateLimitError) return { ok: false, error: err.message };
+    throw err;
+  }
+  if (!idSchema.safeParse(experimentId).success || !idSchema.safeParse(variantId).success) {
+    return { ok: false, error: "Unknown experiment." };
+  }
+  const exp = await getExperimentForUser(user.id, experimentId);
+  if (!exp?.audienceId) return { ok: false, error: "This experiment has no audience yet." };
 
   const people = await listPersonasForAudience(exp.audienceId);
   if (!people.length) return { ok: false, error: "Generate personas before running a simulation." };
+
+  const db = await getDb();
+  const [variant] = await db
+    .select()
+    .from(experimentVariants)
+    .where(and(eq(experimentVariants.id, variantId), eq(experimentVariants.experimentId, exp.id)))
+    .limit(1);
+  if (!variant) return { ok: false, error: "This variant is gone." };
 
   const mock = env().MOCK_LLM;
   const estimate = estimateSimulationJob(people.length, mock);
@@ -55,15 +92,21 @@ export async function startSimulation(experimentId: string): Promise<{ ok: true;
     return { ok: true, jobId: running.id };
   }
   if (running?.status === "cancelled") {
-    const stored = await countReactions(experimentId);
-    if (stored > 0) return resumeSimulation(experimentId);
+    const cp = running.checkpoint as { variantId?: string } | null;
+    if (cp?.variantId === variant.id) {
+      const stored = await countReactions(experimentId, variant.id);
+      if (stored > 0) return resumeSimulation(experimentId);
+    }
   }
 
-  const db = await getDb();
-  const idea = await loadIdeaForExperiment(exp.ideaId);
-  const variant = await ensureControlVariant(exp.id, idea);
-
-  await db.delete(reactions).where(eq(reactions.experimentId, exp.id));
+  await db.delete(reactions).where(eq(reactions.variantId, variant.id));
+  if (variant.isControl) {
+    await db
+      .delete(insights)
+      .where(and(eq(insights.experimentId, exp.id), inArray(insights.kind, [...DASHBOARD_INSIGHT_KINDS])));
+  } else {
+    await db.delete(insights).where(and(eq(insights.experimentId, exp.id), eq(insights.kind, "comparison")));
+  }
   await db
     .update(jobs)
     .set({ status: "cancelled", cancelRequestedAt: new Date(), finishedAt: new Date() })
@@ -95,12 +138,13 @@ export async function startSimulation(experimentId: string): Promise<{ ok: true;
     .set({
       status: "simulating",
       estimatedCostCents: estimate.estimatedCostCents,
-      actualCostCents: 0,
+      actualCostCents: variant.isControl ? 0 : exp.actualCostCents,
       costCapCents: cap,
       completedAt: null,
     })
     .where(eq(experiments.id, exp.id));
 
+  after(() => ensureSimulationJobRunning(job.id));
   return { ok: true, jobId: job.id };
 }
 
@@ -129,7 +173,11 @@ export async function cancelSimulation(jobId: string): Promise<{ ok: true } | Fa
     .set({ cancelRequestedAt: new Date(), status: "cancelled", finishedAt: new Date() })
     .where(eq(jobs.id, jobId));
   if (job.experimentId) {
-    await db.update(experiments).set({ status: "cancelled", completedAt: null }).where(eq(experiments.id, job.experimentId));
+    const stored = await countReactions(job.experimentId);
+    await db
+      .update(experiments)
+      .set({ status: stored > 0 ? "complete" : "cancelled", completedAt: stored > 0 ? new Date() : null })
+      .where(eq(experiments.id, job.experimentId));
   }
   return { ok: true };
 }

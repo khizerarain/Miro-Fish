@@ -15,6 +15,20 @@
       "when": 1793302398766,
       "tag": "0001_idea_wizard_fields",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1793700000000,
+      "tag": "0002_chat_and_compare",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1793720000000,
+      "tag": "0003_iteration_loop",
+      "breakpoints": true
     }
   ]
 }

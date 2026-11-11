@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header";
 import { Button } from "@/components/ui/button";
 import { ExperimentList, ExperimentListSkeleton } from "@/features/experiments/experiment-list";
 import { listExperiments } from "@/features/experiments/queries";
+import { listProjects } from "@/features/projects/queries";
 import { requireUser } from "@/lib/auth";
 
 export const metadata: Metadata = { title: "Experiments" };
@@ -21,7 +22,7 @@ const newButton = (
 
 async function Experiments() {
   const user = await requireUser();
-  const { items, now } = await listExperiments(user.id);
+  const [{ items, now }, projects] = await Promise.all([listExperiments(user.id), listProjects(user.id)]);
   if (items.length === 0) {
     return (
       <EmptyState
@@ -32,7 +33,7 @@ async function Experiments() {
       />
     );
   }
-  return <ExperimentList items={items} now={now} />;
+  return <ExperimentList items={items} now={now} projects={projects.map((p) => ({ id: p.id, name: p.name }))} />;
 }
 
 export default function ExperimentsPage() {
@@ -42,7 +43,17 @@ export default function ExperimentsPage() {
         eyebrow="Experiments"
         title="Experiments"
         description="Every idea you test, with its audience, simulated reactions, and findings."
-        actions={newButton}
+        actions={
+          <div className="flex gap-2">
+            <Button variant="outline" asChild>
+              <Link href="/experiments/archived">Archived</Link>
+            </Button>
+            <Button variant="outline" asChild>
+              <Link href="/projects">Projects</Link>
+            </Button>
+            {newButton}
+          </div>
+        }
       />
       <Suspense fallback={<ExperimentListSkeleton />}>
         <Experiments />

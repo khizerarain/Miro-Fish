@@ -194,8 +194,7 @@ export function AudienceWorkspace({
           initialCharts={charts}
           mockMode={mockMode}
           onRegenerate={() => {
-            setStatus("draft");
-            setJob(null);
+            void generate();
           }}
         />
       </div>

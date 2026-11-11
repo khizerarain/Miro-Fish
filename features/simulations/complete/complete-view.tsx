@@ -1,10 +1,11 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { SimulatedBadge } from "@/components/simulated-badge";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
+import { ChatDrawer, type ChatTarget } from "@/features/chat/drawer";
 import { formatCost } from "../cost";
 import type { SimulationSnapshot } from "../job-types";
 import { StartSimulationCard } from "../start-card";
@@ -31,6 +32,7 @@ export function CompleteView({
   audienceHref: string;
 }) {
   const showExplainer = useSyncExternalStore(explainerStore.subscribe, explainerStore.get, () => false);
+  const [chat, setChat] = useState<ChatTarget | null>(null);
 
   const t = snapshot.tally;
 
@@ -96,6 +98,15 @@ export function CompleteView({
                 <span className="text-sm tabular-nums">{s.interestScore}</span>
               </div>
               <p className="mt-1 text-sm text-pretty">{s.firstImpression}</p>
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                className="mt-2"
+                onClick={() => setChat({ personaId: s.personaId, variantId: snapshot.variantId })}
+              >
+                Talk
+              </Button>
             </li>
           ))}
         </ul>
@@ -111,13 +122,22 @@ export function CompleteView({
       </section>
 
       <div className="flex flex-wrap gap-2">
+        <Button asChild>
+          <Link href={`/experiments/${experimentId}/results`}>Open research dashboard</Link>
+        </Button>
+        <Button variant="outline" asChild>
+          <Link href={`/experiments/${experimentId}/variants`}>A/B test</Link>
+        </Button>
         <Button variant="outline" asChild>
           <Link href={audienceHref}>Back to audience</Link>
         </Button>
       </div>
 
       <StartSimulationCard experimentId={experimentId} personaCount={snapshot.total} mockMode={mockMode} />
-      <p className="text-xs text-muted-foreground">Running again replaces stored reactions for this experiment.</p>
+      <p className="text-xs text-muted-foreground">
+        Running Control again replaces Control reactions only. Other variants stay.
+      </p>
+      <ChatDrawer experimentId={experimentId} target={chat} onClose={() => setChat(null)} />
     </div>
   );
 }
