@@ -131,6 +131,10 @@ async function startBriefing(run: Run, repo: Repo, inst: Installation): Promise<
     await stop(run, repo, inst, "skipped", "No audience connected to this repository yet.");
     return "done";
   }
+  if (audience.status === "generating") {
+    await stop(run, repo, inst, "skipped", "The connected audience is still generating personas. Re-run once it's ready.");
+    return "done";
+  }
   if (!(await hasPersonas(audience.id))) {
     await stop(run, repo, inst, "skipped", "The connected audience has no generated personas yet.");
     return "done";

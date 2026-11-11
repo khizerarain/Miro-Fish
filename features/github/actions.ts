@@ -4,8 +4,11 @@ import { revalidatePath } from "next/cache";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { getDb } from "@/db";
-import { githubInstallations, githubPrRuns, githubRepos } from "@/db/schema";
+import { audiences, githubInstallations, githubPrRuns, githubRepos } from "@/db/schema";
+import { startPersonaGeneration } from "@/features/audiences/actions";
+import { getOwnedAudience } from "@/features/audiences/queries";
 import { requireUser } from "@/lib/auth";
+import { EVERYONE_AUDIENCE_NAME, EVERYONE_AUDIENCE_SEED, EVERYONE_AUDIENCE_SIZE, EVERYONE_DEFINITION } from "./everyone";
 import { advancePrRun } from "./pipeline";
 
 type Fail = { ok: false; error: string };
@@ -30,7 +33,10 @@ export async function setRepoAudience(repoId: string, audienceId: string | null)
   const user = await requireUser();
   const repo = await ownedRepo(user.id, repoId);
   if (!repo) return { ok: false, error: "That repository is not connected to your account." };
-  if (audienceId && !idSchema.safeParse(audienceId).success) return { ok: false, error: "Unknown audience." };
+  if (audienceId) {
+    const audience = await getOwnedAudience(user.id, audienceId);
+    if (!audience || audience.isTemplate) return { ok: false, error: "Unknown audience." };
+  }
 
   const db = await getDb();
   await db
@@ -39,6 +45,56 @@ export async function setRepoAudience(repoId: string, audienceId: string | null)
     .where(eq(githubRepos.id, repo.id));
   revalidatePath("/github");
   return { ok: true };
+}
+
+/**
+ * Connects the repo to the user's broad "Everyone" audience, creating it and starting persona
+ * generation the first time. Reused across repos so they all review with the same people.
+ */
+export async function connectEveryoneAudience(repoId: string): Promise<Ok<{ generating: boolean }> | Fail> {
+  const user = await requireUser();
+  const repo = await ownedRepo(user.id, repoId);
+  if (!repo) return { ok: false, error: "That repository is not connected to your account." };
+
+  const db = await getDb();
+  let [audience] = await db
+    .select()
+    .from(audiences)
+    .where(
+      and(
+        eq(audiences.ownerId, user.id),
+        eq(audiences.name, EVERYONE_AUDIENCE_NAME),
+        eq(audiences.isTemplate, false),
+      ),
+    )
+    .limit(1);
+  if (!audience) {
+    [audience] = await db
+      .insert(audiences)
+      .values({
+        ownerId: user.id,
+        name: EVERYONE_AUDIENCE_NAME,
+        definition: EVERYONE_DEFINITION,
+        size: EVERYONE_AUDIENCE_SIZE,
+        seed: EVERYONE_AUDIENCE_SEED,
+        status: "draft",
+      })
+      .returning();
+  }
+
+  await db
+    .update(githubRepos)
+    .set({ audienceId: audience!.id, updatedAt: new Date() })
+    .where(eq(githubRepos.id, repo.id));
+
+  let generating = audience!.status === "generating";
+  if (audience!.status === "draft" || audience!.status === "failed") {
+    const started = await startPersonaGeneration(audience!.id);
+    if (!started.ok) return started;
+    generating = true;
+  }
+  revalidatePath("/github");
+  return { ok: true, generating };
 }
 
 export async function setRepoToggles(

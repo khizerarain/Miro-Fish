@@ -2,6 +2,8 @@ import "server-only";
 import { requireUser } from "@/lib/auth";
 import { env } from "@/lib/env";
 import { githubConfig, installUrl } from "@/lib/github/app";
+import { estimatePersonaJob, formatCost } from "@/features/audiences/cost";
+import { EVERYONE_AUDIENCE_NAME, EVERYONE_AUDIENCE_SIZE } from "./everyone";
 import { listAudiencesForUser, loadGithubWorkspace } from "./queries";
 
 export type GithubSetupState =
@@ -54,6 +56,18 @@ export async function loadGithubPage() {
       })),
     })),
     audiences: audiences.map((a) => ({ id: a.id, name: a.name, size: a.size, status: a.status })),
+    everyone: everyoneOffer(audiences),
+  };
+}
+
+function everyoneOffer(audiences: { name: string; status: string }[]) {
+  const existing = audiences.find((a) => a.name === EVERYONE_AUDIENCE_NAME);
+  const mock = env().MOCK_LLM;
+  const estimate = estimatePersonaJob(EVERYONE_AUDIENCE_SIZE, mock);
+  return {
+    size: EVERYONE_AUDIENCE_SIZE,
+    needsGeneration: !existing || existing.status === "draft" || existing.status === "failed",
+    costLabel: formatCost(estimate.estimatedCostCents, mock),
   };
 }
 

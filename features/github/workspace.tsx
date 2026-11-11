@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { AlertCircle, Check, Copy, ExternalLink, GitPullRequest, RefreshCw, ShieldAlert } from "lucide-react";
+import { AlertCircle, Check, Copy, ExternalLink, GitPullRequest, RefreshCw, ShieldAlert, Users } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
@@ -11,7 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
-import { disconnectRepo, retryPrRun, setRepoAudience, setRepoToggles } from "./actions";
+import { connectEveryoneAudience, disconnectRepo, retryPrRun, setRepoAudience, setRepoToggles } from "./actions";
+import { EVERYONE_AUDIENCE_NAME } from "./everyone";
 import type { GithubPageData } from "./page-data";
 
 const STATUS_STYLE: Record<string, { label: string; className: string }> = {
@@ -76,7 +77,7 @@ export function GithubWorkspace({ data }: { data: GithubPageData }) {
           ) : (
             <ul className="space-y-4">
               {repos.map((repo) => (
-                <RepoCard key={repo.id} repo={repo} audiences={audiences} />
+                <RepoCard key={repo.id} repo={repo} audiences={audiences} everyone={data.everyone} />
               ))}
             </ul>
           )}
@@ -144,10 +145,25 @@ function SetupCard({ installUrl, webhookPath }: { installUrl: string; webhookPat
 
 type Repo = GithubPageData["repos"][number];
 type Audience = GithubPageData["audiences"][number];
+type EveryoneOffer = GithubPageData["everyone"];
 
-function RepoCard({ repo, audiences }: { repo: Repo; audiences: Audience[] }) {
+function RepoCard({ repo, audiences, everyone }: { repo: Repo; audiences: Audience[]; everyone: EveryoneOffer }) {
   const router = useRouter();
   const [pending, startTransition] = useTransition();
+  const connected = audiences.find((a) => a.id === repo.audienceId);
+
+  const reviewAsEveryone = () => {
+    startTransition(async () => {
+      const res = await connectEveryoneAudience(repo.id);
+      if (!res.ok) toast.error(res.error);
+      else {
+        toast.success(
+          res.generating ? "Connected “Everyone” — generating its personas now" : "Connected the “Everyone” audience",
+        );
+        router.refresh();
+      }
+    });
+  };
 
   const setAudience = (value: string) => {
     startTransition(async () => {
@@ -183,9 +199,18 @@ function RepoCard({ repo, audiences }: { repo: Repo; audiences: Audience[] }) {
           </p>
           <p className="text-xs text-muted-foreground">
             {repo.audienceName ? `Reviews as “${repo.audienceName}”` : "No audience connected — pull requests are skipped"}
+            {connected?.status === "generating" && " · personas are still generating"}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          {connected?.name !== EVERYONE_AUDIENCE_NAME && (
+            <Button type="button" variant="outline" size="sm" disabled={pending} onClick={reviewAsEveryone}>
+              <Users className="size-3.5" aria-hidden="true" />
+              {everyone.needsGeneration
+                ? `Review as everyone · ${everyone.size} people, ${everyone.costLabel}`
+                : "Review as everyone"}
+            </Button>
+          )}
           <Select value={repo.audienceId ?? NONE} onValueChange={setAudience} disabled={pending}>
             <SelectTrigger size="sm" className="w-[220px]">
               <SelectValue placeholder="Choose an audience" />

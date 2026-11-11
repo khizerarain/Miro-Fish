@@ -95,6 +95,8 @@ async function main() {
   const { getDb } = await import("../db");
   const schema = await import("../db/schema");
   const db = await getDb();
+  const { purgeTestUsers } = await import("./purge-test-users");
+  await purgeTestUsers(db, "pipe-");
   const suffix = Date.now().toString(36);
 
   const [user] = await db
@@ -299,6 +301,18 @@ async function main() {
   const enq5 = await enqueuePullRequest({ ...payload, number: 105, pull_request: { ...payload.pull_request, number: 105 } });
   check("rejects a PR when no audience is connected", Boolean(enq5.ignored), enq5.ignored ?? "");
   await db.update(schema.githubRepos).set({ audienceId: audience!.id }).where(eq(schema.githubRepos.id, repo!.id));
+
+  // ------------------------------------------------------------ case 6: audience still generating
+  section("state machine: audience still generating");
+  resetStubs();
+  fileFixture = [{ filename: "app/pricing/page.tsx", status: "modified", additions: 2, deletions: 1, patch: "+ $12/mo" }];
+  await db.update(schema.audiences).set({ status: "generating" }).where(eq(schema.audiences.id, audience!.id));
+  const enq6 = await enqueuePullRequest({ ...payload, number: 106, pull_request: { ...payload.pull_request, number: 106 } });
+  await advancePrRun(enq6.runId);
+  const [run6] = await db.select().from(schema.githubPrRuns).where(eq(schema.githubPrRuns.id, enq6.runId));
+  check("skips instead of reviewing with a half-built audience", run6?.status === "skipped", run6?.statusDetail ?? "");
+  check("tells the author to re-run later", /still generating/.test(run6?.statusDetail ?? ""));
+  await db.update(schema.audiences).set({ status: "ready" }).where(eq(schema.audiences.id, audience!.id));
 
   // ------------------------------------------------------------ cleanup
   globalThis.fetch = realFetch;

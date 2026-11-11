@@ -208,12 +208,39 @@ async function main() {
   const skippedSummary = renderSkippedSummary(internalBrief);
   check("skipped summary explains why nothing ran", /No customer-visible change/.test(skippedSummary));
 
+  // ------------------------------------------------------------------ "Everyone" audience
+  section("everyone audience");
+  const { EVERYONE_DEFINITION, EVERYONE_AUDIENCE_SIZE, EVERYONE_AUDIENCE_SEED } = await import(
+    "../features/github/everyone"
+  );
+  const { audienceDefinitionSchema, segmentCounts } = await import("../features/audiences/schemas");
+  const { allSkeletons } = await import("../features/audiences/allocate");
+  check("definition passes the audience schema", audienceDefinitionSchema.safeParse(EVERYONE_DEFINITION).success);
+  const everyoneCounts = segmentCounts(EVERYONE_DEFINITION, EVERYONE_AUDIENCE_SIZE);
+  check(
+    "segment counts add up to the audience size",
+    Object.values(everyoneCounts).reduce((s, n) => s + n, 0) === EVERYONE_AUDIENCE_SIZE,
+    JSON.stringify(everyoneCounts),
+  );
+  const everyoneSkeletons = allSkeletons(EVERYONE_AUDIENCE_SEED, EVERYONE_DEFINITION, EVERYONE_AUDIENCE_SIZE);
+  const regionsSeen = new Set(everyoneSkeletons.map((s) => s.region));
+  const ages = everyoneSkeletons.map((s) => s.age);
+  check("spans every region", regionsSeen.size === 10, `${regionsSeen.size} regions`);
+  check("spans young to old", Math.min(...ages) < 25 && Math.max(...ages) > 65, `${Math.min(...ages)}–${Math.max(...ages)}`);
+  check(
+    "same seed gives the same people",
+    JSON.stringify(allSkeletons(EVERYONE_AUDIENCE_SEED, EVERYONE_DEFINITION, EVERYONE_AUDIENCE_SIZE)) ===
+      JSON.stringify(everyoneSkeletons),
+  );
+
   // ------------------------------------------------------------------ real DB pipeline
   section("database pipeline (real PGlite)");
   const { getDb } = await import("../db");
   const schema = await import("../db/schema");
   const { eq } = await import("drizzle-orm");
   const db = await getDb();
+  const { purgeTestUsers } = await import("./purge-test-users");
+  await purgeTestUsers(db, "verify-");
 
   const suffix = Date.now().toString(36);
   const [user] = await db

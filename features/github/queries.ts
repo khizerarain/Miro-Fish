@@ -155,7 +155,7 @@ export async function listAudiencesForUser(userId: string) {
   return db
     .select({ id: audiences.id, name: audiences.name, size: audiences.size, status: audiences.status })
     .from(audiences)
-    .where(eq(audiences.ownerId, userId))
+    .where(and(eq(audiences.ownerId, userId), eq(audiences.isTemplate, false)))
     .orderBy(desc(audiences.updatedAt));
 }
 

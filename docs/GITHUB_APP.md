@@ -87,10 +87,18 @@ Restart the server after changing env vars.
 1. Open **GitHub** in the sidebar → **Install on a repository**.
 2. Pick the repositories. GitHub redirects to `/api/github/setup`, which links the installation to
    the Miro Fish account you're signed in as.
-3. Back on the **GitHub** page, choose an **audience** for each repository.
+3. Back on the **GitHub** page, choose an **audience** for each repository, or click
+   **Review as everyone**.
 
-The audience must already have personas. If it doesn't, the PR gets a short note saying so instead
-of a simulation.
+**Review as everyone** creates a broad 100-person audience called "Everyone" the first time and
+generates its personas. The button shows the cost estimate before you click. The audience covers all
+regions and income bands, ages 18–80, and every tech-comfort level, split into mainstream (30%),
+budget-conscious (25%), time-poor (20%), late adopters (15%) and early adopters (10%). The split is a
+hand-picked spread, not census data. All your repositories reuse this one audience, so reviews stay
+comparable.
+
+The audience must already have personas. If it doesn't, or if they're still generating, the PR gets a
+short note saying so instead of a simulation. Use **Re-run** once it's ready.
 
 ---
 
