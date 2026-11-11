@@ -1,5 +1,6 @@
 import { sql } from "drizzle-orm";
 import {
+  bigint,
   boolean,
   index,
   integer,
@@ -41,6 +42,16 @@ export const runStatusEnum = pgEnum("run_status", [
 export const jobTypeEnum = pgEnum("job_type", ["analyze_idea", "generate_personas", "simulate", "analyze_results"]);
 export const purchaseIntentEnum = pgEnum("purchase_intent", ["none", "low", "medium", "high"]);
 export const priceReactionEnum = pgEnum("price_reaction", ["too_cheap", "fair", "expensive", "unaffordable"]);
+export const githubRunStatusEnum = pgEnum("github_run_status", [
+  "queued",
+  "briefing",
+  "simulating",
+  "analyzing",
+  "complete",
+  "failed",
+  "skipped",
+  "cancelled",
+]);
 export const insightKindEnum = pgEnum("insight_kind", [
   "headline",
   "objection_cluster",
@@ -366,6 +377,112 @@ export const realityImports = pgTable(
   (t) => [index("reality_imports_experiment_idx").on(t.experimentId, t.createdAt)],
 );
 
+/** One GitHub App installation (org or personal account) that can post simulated reactions on PRs. */
+export const githubInstallations = pgTable(
+  "github_installations",
+  {
+    id: id(),
+    installationId: bigint("installation_id", { mode: "number" }).notNull(),
+    accountLogin: text("account_login").notNull(),
+    accountType: text("account_type").notNull(),
+    accountId: bigint("account_id", { mode: "number" }),
+    /** Who installed the app inside Miro Fish. Set when the install callback carries a session. */
+    ownerId: uuid("owner_id").references(() => users.id, { onDelete: "set null" }),
+    suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [uniqueIndex("github_installations_installation_idx").on(t.installationId), index("github_installations_owner_idx").on(t.ownerId)],
+);
+
+/** A connected repository. Each repo points at the audience whose simulated customers review its PRs. */
+export const githubRepos = pgTable(
+  "github_repos",
+  {
+    id: id(),
+    installationId: uuid("installation_id")
+      .notNull()
+      .references(() => githubInstallations.id, { onDelete: "cascade" }),
+    repositoryId: bigint("repository_id", { mode: "number" }).notNull(),
+    fullName: text("full_name").notNull(),
+    defaultBranch: text("default_branch"),
+    /** The population that reacts. Null until the owner picks one. */
+    audienceId: uuid("audience_id").references(() => audiences.id, { onDelete: "set null" }),
+    /** The idea/product brief those customers are evaluating. Optional: derived from the PR diff otherwise. */
+    ideaId: uuid("idea_id").references(() => ideas.id, { onDelete: "set null" }),
+    /** Post and update a PR comment. */
+    commentEnabled: boolean("comment_enabled").notNull().default(true),
+    /** Publish a check run. Neutral conclusion — it never blocks a merge. */
+    checkEnabled: boolean("check_enabled").notNull().default(true),
+    lastSyncedAt: timestamp("last_synced_at", { withTimezone: true }),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("github_repos_repository_idx").on(t.repositoryId),
+    index("github_repos_installation_idx").on(t.installationId),
+  ],
+);
+
+/** Every delivered webhook, so redeliveries are ignored and the event log is inspectable. */
+export const githubDeliveries = pgTable(
+  "github_deliveries",
+  {
+    id: id(),
+    deliveryId: text("delivery_id").notNull(),
+    event: text("event").notNull(),
+    action: text("action"),
+    /** e.g. owner/repo#12 — helps when debugging from the settings page. */
+    subject: text("subject"),
+    receivedAt: timestamp("received_at", { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [uniqueIndex("github_deliveries_delivery_idx").on(t.deliveryId)],
+);
+
+/**
+ * One simulated review of one pull request. Status drives the UI and the check run;
+ * all numbers posted to GitHub are recomputed from stored reactions.
+ */
+export const githubPrRuns = pgTable(
+  "github_pr_runs",
+  {
+    id: id(),
+    repoId: uuid("repo_id")
+      .notNull()
+      .references(() => githubRepos.id, { onDelete: "cascade" }),
+    prNumber: integer("pr_number").notNull(),
+    prTitle: text("pr_title").notNull(),
+    prBody: text("pr_body"),
+    prUrl: text("pr_url").notNull(),
+    headSha: text("head_sha"),
+    authorLogin: text("author_login"),
+    status: githubRunStatusEnum("status").notNull().default("queued"),
+    /** Set when the run completes or fails: why it was skipped, or the error. */
+    statusDetail: text("status_detail"),
+    /** What customers were shown: the brief derived from the diff. */
+    brief: jsonb("brief"),
+    /** The experiment that holds the reactions for this PR. */
+    experimentId: uuid("experiment_id").references(() => experiments.id, { onDelete: "set null" }),
+    /** Narrative written around computed stats once the simulation finishes. */
+    narrative: jsonb("narrative"),
+    /** The exact markdown posted to GitHub, kept so edits can be diffed. */
+    commentBody: text("comment_body"),
+    commentId: bigint("comment_id", { mode: "number" }),
+    checkRunId: bigint("check_run_id", { mode: "number" }),
+    filesChanged: integer("files_changed").notNull().default(0),
+    additions: integer("additions").notNull().default(0),
+    deletions: integer("deletions").notNull().default(0),
+    ...timestamps,
+  },
+  (t) => [
+    uniqueIndex("github_pr_runs_repo_pr_idx").on(t.repoId, t.prNumber),
+    index("github_pr_runs_repo_idx").on(t.repoId, t.createdAt),
+    index("github_pr_runs_status_idx").on(t.status),
+  ],
+);
+
+export type GithubInstallation = typeof githubInstallations.$inferSelect;
+export type GithubRepo = typeof githubRepos.$inferSelect;
+export type GithubDelivery = typeof githubDeliveries.$inferSelect;
+export type GithubPrRun = typeof githubPrRuns.$inferSelect;
 
 export type User = typeof users.$inferSelect;
 export type Project = typeof projects.$inferSelect;

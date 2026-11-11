@@ -1,0 +1,1 @@
+ALTER TABLE "github_pr_runs" ADD COLUMN "pr_body" text;

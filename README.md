@@ -30,6 +30,19 @@ With the defaults, no external services are needed:
 
 Audience regeneration keeps personas whose demographics still match the new definition and only fills what changed.
 
+## GitHub App (pull request reviews)
+
+Connect a repository and an audience, and every pull request gets a **Simulated customer reaction**
+comment plus a neutral check run: what a customer would notice in the change, how the audience reacts,
+and what to validate with real people. Internal-only diffs (tests, CI, lockfiles, docs) produce no
+comment.
+
+Setup is in [docs/GITHUB_APP.md](docs/GITHUB_APP.md). Without `GITHUB_APP_ID`,
+`GITHUB_APP_PRIVATE_KEY` and `GITHUB_WEBHOOK_SECRET` the integration is inert.
+
+```bash
+npm run verify:github   # offline checks, no GitHub or API keys needed
+```
 
 ## LLM calls
 
@@ -62,13 +75,14 @@ Per-user rate limits and caps (active experiments, jobs/day) live in `lib/rate-l
 | `npm run db:generate` | Generate a migration after editing `db/schema.ts` |
 | `npm run db:migrate`  | Apply migrations                                  |
 | `npm run db:studio`   | Drizzle Studio                                    |
+| `npm run verify:github` | Offline checks for the GitHub integration       |
 
 ## Layout
 
 ```
 app/          routes: (marketing), (auth), (app) shell, /design, /s share
 components/   shared UI; components/ui is shadcn
-features/     ideas, audiences, simulations, results, chat, variants, projects, history, improve, reality
+features/     ideas, audiences, simulations, results, chat, variants, projects, history, improve, reality, github
 lib/          env, auth, LLM, rate limit, usage, analytics
 db/           Drizzle schema, client, migrations
 jobs/         persona generation, simulation, analysis

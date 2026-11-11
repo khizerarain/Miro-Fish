@@ -10,6 +10,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "tsx scripts/migrate.ts",
     "db:studio": "drizzle-kit studio",
+    "verify:github": "tsx --import ./scripts/no-server-only.mjs scripts/verify-github.ts && tsx --import ./scripts/no-server-only.mjs scripts/verify-pipeline.ts",
     "format": "prettier --write .",
     "typecheck": "tsc --noEmit"
   },
