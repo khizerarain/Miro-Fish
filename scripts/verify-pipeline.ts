@@ -19,7 +19,7 @@ import { eq } from "drizzle-orm";
 function injectTestCredentials() {
   const { privateKey } = generateKeyPairSync("rsa", {
     modulusLength: 2048,
-    privateKeyEncoding: { type: "pkcs8", format: "pem" },
+    privateKeyEncoding: { type: "pkcs1", format: "pem" },
     publicKeyEncoding: { type: "spki", format: "pem" },
   });
   process.env.GITHUB_APP_ID = "123456";

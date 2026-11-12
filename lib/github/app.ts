@@ -1,5 +1,6 @@
 import "server-only";
-import { importPKCS8, SignJWT } from "jose";
+import { createPrivateKey } from "node:crypto";
+import { SignJWT } from "jose";
 import type { GithubRepo } from "@/db/schema";
 import { env } from "@/lib/env";
 
@@ -34,7 +35,7 @@ export function githubConfig(): GithubConfig | null {
     // value was pasted or written, that can be "\n" or "\\n" — normalise both to real newlines.
     privateKey: e.GITHUB_APP_PRIVATE_KEY.replace(/\\\\n/g, "\n").replace(/\\n/g, "\n").trim(),
     webhookSecret: e.GITHUB_WEBHOOK_SECRET,
-    slug: e.GITHUB_APP_SLUG ?? null,
+    slug: e.GITHUB_APP_SLUG?.replace(/^https?:\/\/github\.com\/apps\//, "").replace(/\/+$/, "") || null,
   };
 }
 
@@ -46,7 +47,8 @@ export function installUrl(config: GithubConfig) {
 async function appJwt(config: GithubConfig): Promise<string> {
   let key;
   try {
-    key = await importPKCS8(config.privateKey, "RS256");
+    // GitHub hands out PKCS#1 ("BEGIN RSA PRIVATE KEY"); Node reads both that and PKCS#8.
+    key = createPrivateKey(config.privateKey);
   } catch (err) {
     throw new GithubError(
       `GITHUB_APP_PRIVATE_KEY could not be read as a PEM private key (${(err as Error).message}). ` +

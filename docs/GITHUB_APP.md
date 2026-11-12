@@ -45,8 +45,9 @@ Nothing else. No write access to code, no access to Actions or secrets.
 ### Subscribe to events
 
 - **Pull request**
-- **Installation**
-- **Installation repositories**
+
+Installation and installation-repository events aren't in that list. GitHub always sends them to
+every app, so there's nothing to tick for them.
 
 ### Where can it be installed?
 
