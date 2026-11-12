@@ -19,12 +19,15 @@ Go to **GitHub → Settings → Developer settings → GitHub Apps → New GitHu
 | **GitHub App name** | anything, e.g. `Miro Fish Reviews` |
 | **Homepage URL** | your deployment URL, e.g. `https://mirofish.example.com` |
 | **Webhook URL** | `https://<your-host>/api/github/webhook` |
-| **Webhook secret** | a long random string — you'll paste it into `.env.local` |
+| **Webhook secret** | optional in development; required in production (see below) |
 | **Setup URL** | `https://<your-host>/api/github/setup` |
 
 Tick **Redirect on update** next to the Setup URL.
 
-Generate a secret with:
+For local testing you can leave the secret empty, both on GitHub and in `.env.local`. Unsigned
+deliveries are accepted only when the server isn't running in production. A production server
+refuses them, because anyone who knows the webhook URL could otherwise send fake pull request
+events. Before deploying, generate a secret with:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -76,8 +79,9 @@ The private key can be pasted as one line with `\n` between the header, each lin
 the footer. Both `\n` and `\\n` are accepted; the loader normalises them. Keep the `BEGIN` and `END`
 lines.
 
-Without all three of `GITHUB_APP_ID`, `GITHUB_APP_PRIVATE_KEY` and `GITHUB_WEBHOOK_SECRET` the
-integration stays inert: the webhook answers `503` and nothing is posted.
+Without both `GITHUB_APP_ID` and `GITHUB_APP_PRIVATE_KEY` the integration stays inert: the webhook
+answers `503` and nothing is posted. `GITHUB_WEBHOOK_SECRET` is optional in development and
+required in production.
 
 Restart the server after changing env vars.
 

@@ -8,7 +8,7 @@ import { listAudiencesForUser, loadGithubWorkspace } from "./queries";
 
 export type GithubSetupState =
   | { configured: false; reason: string }
-  | { configured: true; installUrl: string; appSlug: string | null; webhookPath: string };
+  | { configured: true; installUrl: string; appSlug: string | null; webhookPath: string; unsigned: boolean };
 
 export async function loadGithubPage() {
   const user = await requireUser();
@@ -21,6 +21,7 @@ export async function loadGithubPage() {
         installUrl: installUrl(config),
         appSlug: config.slug,
         webhookPath: `${env().APP_URL}/api/github/webhook`,
+        unsigned: !config.webhookSecret,
       }
     : {
         configured: false,
@@ -78,6 +79,5 @@ export function missingEnvReason() {
   const missing: string[] = [];
   if (!e.GITHUB_APP_ID) missing.push("GITHUB_APP_ID");
   if (!e.GITHUB_APP_PRIVATE_KEY) missing.push("GITHUB_APP_PRIVATE_KEY");
-  if (!e.GITHUB_WEBHOOK_SECRET) missing.push("GITHUB_WEBHOOK_SECRET");
   return missing.length ? `Set ${missing.join(", ")} in .env.local, then restart the server.` : "";
 }

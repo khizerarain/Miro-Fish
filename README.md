@@ -37,8 +37,9 @@ comment plus a neutral check run: what a customer would notice in the change, ho
 and what to validate with real people. Internal-only diffs (tests, CI, lockfiles, docs) produce no
 comment.
 
-Setup is in [docs/GITHUB_APP.md](docs/GITHUB_APP.md). Without `GITHUB_APP_ID`,
-`GITHUB_APP_PRIVATE_KEY` and `GITHUB_WEBHOOK_SECRET` the integration is inert.
+Setup is in [docs/GITHUB_APP.md](docs/GITHUB_APP.md). Without `GITHUB_APP_ID` and
+`GITHUB_APP_PRIVATE_KEY` the integration is inert. `GITHUB_WEBHOOK_SECRET` is optional in
+development and required in production.
 
 ```bash
 npm run verify:github   # offline checks, no GitHub or API keys needed

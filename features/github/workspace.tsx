@@ -34,7 +34,7 @@ export function GithubWorkspace({ data }: { data: GithubPageData }) {
   return (
     <div className="space-y-10">
       {setup.configured ? (
-        <SetupCard installUrl={setup.installUrl} webhookPath={setup.webhookPath} />
+        <SetupCard installUrl={setup.installUrl} webhookPath={setup.webhookPath} unsigned={setup.unsigned} />
       ) : (
         <Card className="max-w-3xl border-dashed">
           <CardHeader>
@@ -87,7 +87,7 @@ export function GithubWorkspace({ data }: { data: GithubPageData }) {
   );
 }
 
-function SetupCard({ installUrl, webhookPath }: { installUrl: string; webhookPath: string }) {
+function SetupCard({ installUrl, webhookPath, unsigned }: { installUrl: string; webhookPath: string; unsigned: boolean }) {
   const [copied, setCopied] = useState(false);
   return (
     <Card className="max-w-3xl">
@@ -131,6 +131,13 @@ function SetupCard({ installUrl, webhookPath }: { installUrl: string; webhookPat
           Webhook: <code className="rounded bg-muted px-1.5 py-0.5">{webhookPath}</code> · requires a public URL (use a
           tunnel in development).
         </p>
+        {unsigned && (
+          <p className="text-xs text-muted-foreground">
+            No webhook secret is set, so deliveries aren&apos;t signed. That&apos;s accepted in development only; a
+            production server refuses them until <code className="rounded bg-muted px-1.5 py-0.5">GITHUB_WEBHOOK_SECRET</code>{" "}
+            is set.
+          </p>
+        )}
         <div className="flex gap-2 rounded-lg border border-dashed p-3 text-xs text-muted-foreground">
           <ShieldAlert className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
           <p className="text-pretty">

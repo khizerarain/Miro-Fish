@@ -21,20 +21,21 @@ export class GithubError extends Error {
 export type GithubConfig = {
   appId: string;
   privateKey: string;
-  webhookSecret: string;
+  /** Null means deliveries aren't signed; the webhook only accepts that outside production. */
+  webhookSecret: string | null;
   slug: string | null;
 };
 
 /** Returns the GitHub App config, or null when the integration is not set up. */
 export function githubConfig(): GithubConfig | null {
   const e = env();
-  if (!e.GITHUB_APP_ID || !e.GITHUB_APP_PRIVATE_KEY || !e.GITHUB_WEBHOOK_SECRET) return null;
+  if (!e.GITHUB_APP_ID || !e.GITHUB_APP_PRIVATE_KEY) return null;
   return {
     appId: e.GITHUB_APP_ID,
     // Env vars are single-line, so PEMs usually arrive with escaped newlines. Depending on how the
     // value was pasted or written, that can be "\n" or "\\n" — normalise both to real newlines.
     privateKey: e.GITHUB_APP_PRIVATE_KEY.replace(/\\\\n/g, "\n").replace(/\\n/g, "\n").trim(),
-    webhookSecret: e.GITHUB_WEBHOOK_SECRET,
+    webhookSecret: e.GITHUB_WEBHOOK_SECRET ?? null,
     slug: e.GITHUB_APP_SLUG?.replace(/^https?:\/\/github\.com\/apps\//, "").replace(/\/+$/, "") || null,
   };
 }

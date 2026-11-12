@@ -16,7 +16,8 @@ import {
  *
  * Rules, in order:
  *  1. Read the RAW body — parsing first breaks the HMAC.
- *  2. Verify X-Hub-Signature-256 with a timing-safe compare.
+ *  2. Verify X-Hub-Signature-256 with a timing-safe compare. Unsigned deliveries (no secret
+ *     configured) are accepted in development only.
  *  3. Deduplicate by X-GitHub-Delivery (GitHub retries failed deliveries).
  *  4. Acknowledge fast; do the slow work in `after()`.
  */
@@ -28,10 +29,20 @@ export async function POST(request: Request) {
   }
 
   const raw = await request.text();
-  const signature = request.headers.get("x-hub-signature-256");
-  if (!verifyWebhookSignature(raw, signature, config.webhookSecret)) {
-    console.warn(JSON.stringify({ evt: "github", step: "webhook", ok: false, reason: "bad_signature" }));
-    return NextResponse.json({ error: "Invalid signature." }, { status: 401 });
+  if (config.webhookSecret) {
+    const signature = request.headers.get("x-hub-signature-256");
+    if (!verifyWebhookSignature(raw, signature, config.webhookSecret)) {
+      console.warn(JSON.stringify({ evt: "github", step: "webhook", ok: false, reason: "bad_signature" }));
+      return NextResponse.json({ error: "Invalid signature." }, { status: 401 });
+    }
+  } else if (process.env.NODE_ENV === "production") {
+    // Without a secret anyone who knows this URL could forge pull request events.
+    return NextResponse.json(
+      { error: "GITHUB_WEBHOOK_SECRET is required in production." },
+      { status: 503 },
+    );
+  } else {
+    console.warn(JSON.stringify({ evt: "github", step: "webhook", unsigned: true, note: "no secret set (dev only)" }));
   }
 
   const event = request.headers.get("x-github-event") ?? "";
